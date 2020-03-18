@@ -1,0 +1,372 @@
+	   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+	     CROSS-COMPILE A GTK3 APP FROM LINUX TO WINDOWS
+		   WITH NATIVE WINDOWS LOOK AND FEEL
+	   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+
+1 Introduction
+══════════════
+
+  One of my research projects involves writing a Windows app for a
+  department at my school. I only run Linux.
+
+  Here I’ve compiled the steps necessary to build and run a GUI [GTK3]
+  program on both Linux and Windows.This includes the frills most
+  Windows users expect, like a graphical installer, an icon on the
+  executable, and a program that looks like it was made for Windows.
+
+  You can view the results of the tutorial in [this repository].
+
+  Create the demo C program from [the GTK documentation] and save it as
+  `main.c'.
+
+  To compile the code on Linux, a simple
+  ┌────
+  │ $ gcc -o main main.c `pkg-config --libs gtk+-3.0 --cflags gtk+-3.0`
+  └────
+  will do the trick (you need pkg-config, GCC, and GTK3 installed). Test
+  the executable to make sure it works:
+  ┌────
+  │ $ ./main
+  └────
+
+
+[GTK3] <https://www.gtk.org/>
+
+[this repository] <https://github.com/wrycode/GTK-demo-C>
+
+[the GTK documentation]
+<https://developer.gnome.org/gtk3/stable/gtk-getting-started.html>
+
+1.1 Windows setup
+─────────────────
+
+  To build for Windows, you need to use [MinGW] to compile the
+  executable, and then you need to bundle the MinGW GTK dlls so they’re
+  available at runtime on Windows.
+
+  First install MinGW. If this step seems insurmountable, or if you’re
+  running Arch Linux or a similar distro, just skip ahead to the
+  [Buildah] section.
+
+  On Fedora, for example, you can install everything you need with this
+  command:
+
+  ┌────
+  │ dnf install mingw64-gtk3 mingw32-binutils mingw32-nsiswrapper
+  └────
+
+
+[MinGW] <http://www.mingw.org/>
+
+[Buildah] See section 1.2
+
+1.1.1 Compiling for Windows
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+
+  On a Linux system with MinGW installed, you can compile the same
+  program with something like:
+  ┌────
+  │ $ x86_64-w64-mingw32-gcc -o main main.c `mingw64-pkg-config --cflags gtk+-3.0 --libs gtk+-3.0`
+  └────
+
+  You should now have an executable called `main.exe'. Obviously this
+  won’t work on Linux, but it also won’t work on Windows until you make
+  the GTK libraries available to it at runtime.
+
+
+1.1.2 Bundle GTK libraries
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+
+  Make a subdirectory called `windows' and copy the `.exe' into it. Now
+  copy the MinGW libraries over to the same folder. Unfortunately,
+  different Linux distributions have different locations (and sometimes
+  even different names for the MinGW executables). On Fedora, they’re
+  found at `/usr/x86_64-w64-mingw32/sys-root/mingw/*'.
+
+
+1.1.3 Test on Windows
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+
+  If you copy the whole `windows' folder to a Windows computer or VM,
+  the program should now run as expected. Magically enough, [WINE] is
+  also able to run the program from Linux (although I don’t recommend
+  testing with WINE).
+
+  However, the program looks like bad because it uses GNOME’s Adwaita
+  theme (which looks bad on Windows), it uses GTK to render the
+  client-side decorations (the top of the window with the exit button),
+  there’s no icon for the program in Windows’ taskbar, and the program
+  runs with a black command prompt window in the
+  background. Furthermore, it’s not ideal to distribute the program by
+  zipping up this folder and sharing it.
+
+
+[WINE] <https://en.wikipedia.org/wiki/Wine_(software)>
+
+
+1.1.4 Fix Icon
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+
+  Download or create an icon.  From within the code you can set the icon
+  for the program like this:
+
+  ┌────
+  │ GdkPixbuf *icon;
+  │ icon = create_pixbuf("icon.ico");  
+  │ gtk_window_set_icon(GTK_WINDOW(window), icon);
+  └────
+  The code for `create_pixbuf' is:
+  ┌────
+  │ GdkPixbuf *create_pixbuf(const gchar * filename) {
+  │ 
+  │    GdkPixbuf *pixbuf;
+  │    GError *error = NULL;
+  │    pixbuf = gdk_pixbuf_new_from_file(filename, &error);
+  │ 
+  │    if (!pixbuf) {
+  │ 
+  │       fprintf(stderr, "%s\n", error->message);
+  │       g_error_free(error);
+  │    }
+  │ 
+  │    return pixbuf;
+  │ }
+  └────
+
+  This will change the icon of the program while it’s running. It shows
+  up correctly in the Windows taskbar and window decorations, but it
+  won’t change the icon of the actual `.exe'. I still recommend
+  including this code, because it works to set the icon on Linux desktop
+  environments.
+
+  To change the icon of the executable file on Windows, we have to use
+  MinGW’s windres utility. Create a file called “icon.rc” with the
+  contents:
+
+  ┌────
+  │ id ICON "icon.ico"
+  └────
+
+  and then run:
+
+  ┌────
+  │ x86_64-w64-mingw32-windres icon.rc -O coff -o icon.res
+  └────
+
+  Now we can add the `icon.res' resource file to the executable by
+  slightly modifying our GCC call:
+
+  ┌────
+  │ $ x86_64-w64-mingw32-gcc -o main main.c icon.res `mingw64-pkg-config --cflags gtk+-3.0 --libs gtk+-3.0`
+  └────
+
+  Now the actual `.exe' file will have an icon associated with it on
+  Windows.
+
+
+1.1.5 Remove Command Prompt window
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+
+  Just add the `-mwindows' flag to your compile command.
+
+
+1.1.6 Fix Window Decorations
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+
+  You can disable the GTK client-side decorations by adding the
+  following line to the code:
+
+  ┌────
+  │ putenv("GTK_CSD=0");
+  └────
+
+  Now the program should use the normal Windows exit button and drag
+  bar.
+
+
+1.1.7 Switch to a Windows GTK theme
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+
+  Adwaita looks bad on Windows. Search [Gnome-Look] for a different GTK3
+  theme to use with your app. You can choose a flatter, lighter theme or
+  one specifically made to look like Windows. For this example, I chose
+  the “Windows10” theme.
+
+  Download and extract the theme, then copy it to the `share/themes/'
+  directory in the `windows/' directory we’ve been using.
+
+  Then create a file called `settings.ini' in a `etc/gtk-3.0/' folder
+  (also in the `windows/' directory) with the following contents:
+
+  ┌────
+  │ [Settings]
+  │ gtk-theme-name=Windows10
+  └────
+
+  Now the program should look like native Windows software:
+
+  <file:media/main_gtk_tutorial_screenshot.png>
+
+
+[Gnome-Look] <https://www.gnome-look.org/>
+
+
+1.1.8 Generate an installer
+╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌
+
+  Here’s how to make an installer, so your users don’t have to manually
+  unzip this `windows/' folder, using a script called
+  [nsiswrapper]. Nsiswrapper generates an [NSIS] script and optionally
+  compiles it using `makensis'.
+
+  `cd' into the `windows/' directory, and run:
+
+  ┌────
+  │ nsiswrapper --run main.exe ./*
+  └────
+
+  This should generate a new file called `installer.exe', which you can
+  use to distribute the program. The installer is a standard GUI wizard
+  that Windows users will be accustomed to. It allows users to
+  optionally add a desktop shortcut, start menu entry, and taskbar
+  shortcut.
+
+  Notably, it also includes an uninstaller.
+
+
+[nsiswrapper] <https://src.fedoraproject.org/rpms/mingw-nsiswrapper>
+
+[NSIS] <https://sourceforge.net/projects/nsis/>
+
+
+1.2 Automation + Buildah
+────────────────────────
+
+  You may have noticed that I’ve been using Fedora to compile this
+  program. I’m actually running Arch Linux, but MinGW packages aren’t
+  easily available for Arch, so I’ve been using a [Linux container] to
+  take advantage of Fedora’s package system.
+
+  I’m using [Buildah] instead of Docker. I wrote a script to automate
+  the following tasks
+
+  • set up a named fedora container
+  • install the necessary packages using dnf
+  • save the container so I don’t have to download dependencies again
+  • compile the GTK program using the steps I’ve outlined so far
+  • generate the installer
+
+  Before you look at the script, I recommend reading the [buildah
+  introduction tutorial].
+
+  ┌────
+  │ #!/bin/bash
+  │ setup () {
+  │     # Create a fedora container
+  │     container=$(buildah from fedora)
+  │ 
+  │     # Install dependencies 
+  │     buildah run $container dnf -y install mingw64-gtk3 mingw32-binutils mingw32-nsiswrapper 
+  │ 
+  │      # Fix typo in mingw library
+  │     buildah run $container bash -c "sed -i -e 's/-Wl,-luuid/-luuid/g' /usr/x86_64-w64-mingw32/sys-root/mingw/lib/pkgconfig/gdk-3.0.pc"
+  │ 
+  │     # Cache image to avoid re-downloading dependencies every time
+  │     buildah commit $container my-gtk-app
+  │ 
+  │     # Clean up
+  │     buildah rm $container
+  │ }
+  │ 
+  │ build () {
+  │     # Create a new container from the base one we created
+  │     container=$(buildah from localhost/my-gtk-app)
+  │ 
+  │     # Folder to hold everything needed for the windows installer:
+  │     output_folder=windows
+  │     yes | rm -r $output_folder
+  │     mkdir $output_folder
+  │ 
+  │     # Directory of your package in the container
+  │     folder=/root/app
+  │ 
+  │     # Copy program into container
+  │     buildah copy $container . $folder
+  │ 
+  │     # Name for the executable file on Windows
+  │     executable_name="Demo.exe"
+  │ 
+  │     # make some folders we'll need
+  │     buildah run $container bash -c "cd $folder && mkdir -p $output_folder/share/themes $output_folder/etc/gtk-3.0"
+  │ 
+  │     # generate a RC file with the windres utility to embed an icon into the .exe later on
+  │     buildah run $container bash -c "cd $folder && x86_64-w64-mingw32-windres icon.rc -O coff -o icon.res"
+  │ 
+  │     # copy some project resources
+  │     buildah run $container bash -c "cd $folder && cp -r Windows10 $output_folder/share/themes && \
+  │     cp settings.ini $output_folder/etc/gtk-3.0/ &&\
+  │     cp icon.ico $output_folder"
+  │ 
+  │     # Compile program
+  │     buildah run $container bash -c "cd $folder && x86_64-w64-mingw32-gcc -mwindows -o $executable_name main.c icon.res \`mingw64-pkg-config --cflags gtk+-3.0 --libs gtk+-3.0\`"
+  │ 
+  │     # Copy executable into installation folder
+  │     buildah run $container bash -c "cd $folder && cp $executable_name $output_folder"
+  │ 
+  │     # Copy mingw dlls into installation folder
+  │     # This part may need to be personalized
+  │     buildah run $container bash -c "yes | cp -r /usr/x86_64-w64-mingw32/sys-root/mingw/{bin/*.dll,share} $folder/$output_folder/"
+  │ 
+  │     # Generate an installer
+  │     buildah run $container bash -ic "cd $folder/$output_folder && nsiswrapper --run $executable_name ./*"
+  │ 
+  │     # Copy the output from the container
+  │     cp -ru $(buildah unshare buildah mount $container)$folder/$output_folder .
+  │ 
+  │     # Clean up
+  │     buildah rm $container
+  │ }
+  │ 
+  │ # This just checks whether the container already exists on your drive
+  │ buildah inspect localhost/my-gtk-app &>/dev/null
+  │ return_value=$?
+  │ 
+  │ if [ $return_value -eq 1 ]
+  │ then
+  │     echo "Initial container setup"
+  │     setup
+  │ fi
+  │ 
+  │ # Build project
+  │ build
+  └────
+
+
+[Linux container] <https://en.wikipedia.org/wiki/LXC>
+
+[Buildah] <https://github.com/containers/buildah>
+
+[buildah introduction tutorial]
+<https://github.com/containers/buildah/blob/master/docs/tutorials/01-intro.md>
+
+
+1.3 References
+──────────────
+
+  • [windows - How do I add an icon to a mingw-gcc compiled executable?
+    - Stack Ov…]
+  • [Disable client side decorations (GTK_CSD) by default on Windows
+    (win32) (#760…]
+  • [Compile for Windows on Linux | BlogCompiler]
+
+
+[windows - How do I add an icon to a mingw-gcc compiled executable? -
+Stack Ov…]
+<https://stackoverflow.com/questions/708238/how-do-i-add-an-icon-to-a-mingw-gcc-compiled-executable>
+
+[Disable client side decorations (GTK_CSD) by default on Windows (win32)
+(#760…] <https://gitlab.gnome.org/GNOME/gtk/issues/760>
+
+[Compile for Windows on Linux | BlogCompiler]
+<https://www.blogcompiler.com/2010/07/11/compile-for-windows-on-linux/>
