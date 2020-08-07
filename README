@@ -39,8 +39,8 @@ Windows setup
   available at runtime on Windows.
 
   First install MinGW. If this step seems insurmountable, or if you’re
-  running Arch Linux or a similar distro, just skip ahead to the
-  [Buildah] section.
+  running Arch Linux or a similar distro, just skip to the [Automating
+  builds] section.
 
   On Fedora, for example, you can install everything you need with this
   command:
@@ -52,7 +52,7 @@ Windows setup
 
 [MinGW] <http://www.mingw.org/>
 
-[Buildah] See section Automation + Buildah
+[Automating builds] See section Automating builds
 
 Compiling for Windows
 ─────────────────────
@@ -235,8 +235,8 @@ Generate an installer
 [NSIS] <https://sourceforge.net/projects/nsis/>
 
 
-Automation + Buildah
-════════════════════
+Automating builds
+═════════════════
 
   You may have noticed that I’ve been using Fedora to compile this
   program. I’m actually running Arch Linux, but MinGW packages aren’t
